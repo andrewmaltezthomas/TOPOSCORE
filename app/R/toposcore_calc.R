@@ -1,6 +1,9 @@
 library(dplyr)
 library(readr)
 
+
+input_file <- "~/Desktop/PREBIOMICS/Seerave/TOPOSCORE/tests/roussy_004_0325_mpa_vJan21_CHOCOPhlAnSGB_202103_toposcoreSGBs_unclassfied.tsv"
+taxonomy_database <- 'SGB_Jan21'
 calculate_toposcore <- function(input_file, taxonomy_database = c("species_Jan21", "SGB_Jan21", "SGB_Jun23", "GTDB_r207", "GTDB_r220")) {
   
   # Read-in the data for MetaPhlAn format
@@ -11,7 +14,7 @@ calculate_toposcore <- function(input_file, taxonomy_database = c("species_Jan21
     }
     else {
       taxa <- data$clade_name
-      data <- data %>% select(-clade_name)
+      data <- data %>% dplyr::select(-clade_name)
       sampleIDs <- colnames(data)
       data <- as_tibble(t(data))
       colnames(data) <- taxa
@@ -135,8 +138,31 @@ calculate_toposcore <- function(input_file, taxonomy_database = c("species_Jan21
     }))
   }
   
+  get_groups <- function(row, group_df, column) {
+    gt_zero <- row > 0
+    names(gt_zero) <- names(row)
+    
+    sapply(group_df[,column, drop = T], function(cols) {
+      col_list <- unlist(strsplit(cols, ","))
+      col_list <- col_list[col_list %in% names(gt_zero)]
+      any(gt_zero[col_list])
+    })
+  }
+  
+  
   data$SIG1_count <- apply(data[, !sapply(data, is.character)], 1, count_groups, group_df = sig1_species, column = taxonomy_database)
+  sig1_taxa <- apply(data[, !sapply(data, is.character)], 1, get_groups, group_df = sig1_species, column = taxonomy_database)
+  rownames(sig1_taxa) <- sig1_species$species_Jan21
+  data$SIG1_taxa <- unlist(lapply(apply(sig1_taxa, 2, function(sample) {
+    names(which(sample == TRUE))
+  }), function(x) { paste0(x, collapse = ";")}))
+  
   data$SIG2_count <- apply(data[, !sapply(data, is.character)], 1, count_groups, group_df = sig2_species, column = taxonomy_database)
+  sig2_taxa <- apply(data[, !sapply(data, is.character)], 1, get_groups, group_df = sig2_species, column = taxonomy_database)
+  rownames(sig2_taxa) <- sig2_species$species_Jan21
+  data$SIG2_taxa <- unlist(lapply(apply(sig2_taxa, 2, function(sample) {
+    names(which(sample == TRUE))
+  }), function(x) { paste0(x, collapse = ";")}))
   
   data$S_score <- round((data$SIG2_count/45 - 
                            data$SIG1_count/37 + 1)/2, 3)
@@ -168,7 +194,7 @@ calculate_toposcore <- function(input_file, taxonomy_database = c("species_Jan21
           SIG_class == "Gray" & (Akk_status == "Normal") ~ "SIG2+",
           TRUE ~ "SIG2+"))
     results$Sample_id <- sampleIDs
-    results <- results %>% select(
+    results <- results %>% dplyr::select(
       Sample_id, 
       Akk_status,
       SIG1_count,
@@ -176,6 +202,8 @@ calculate_toposcore <- function(input_file, taxonomy_database = c("species_Jan21
       S_score,
       SIG_class,
       Toposcore,
+      SIG1_taxa, 
+      SIG2_taxa, 
       # Include OS12 if it exists in the input data
       any_of("OS12")
     )
@@ -196,7 +224,7 @@ calculate_toposcore <- function(input_file, taxonomy_database = c("species_Jan21
           SIG_class == "Gray" & (Akk_status == "Normal") ~ "SIG2+",
           TRUE ~ "SIG2+"))
     results$Sample_id <- sampleIDs
-    results <- results %>% select(
+    results <- results %>% dplyr::select(
       Sample_id, 
       Akk_status,
       SIG1_count,
@@ -204,6 +232,8 @@ calculate_toposcore <- function(input_file, taxonomy_database = c("species_Jan21
       S_score,
       SIG_class,
       Toposcore,
+      SIG1_taxa, 
+      SIG2_taxa,
       # Include OS12 if it exists in the input data
       any_of("OS12")
     )

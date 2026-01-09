@@ -23,7 +23,7 @@ ui <- fluidPage(
                fileInput("file", "Upload microbiome tab-separated data",
                          accept = c("text/tsv", "text/tab-separated-values,text/plain", ".txt/.tsv"))
         ),
-        selectInput("Level", "Select taxonomy level and database", choices = c("Species - MetaPhlAn 4 vJan21", "SGB - MetaPhlAn 4 vJan21", "SGB - MetaPhlAn 4 vJun23", "Species - GTDB r207", "Species - GTDB r220")),
+        selectInput("Level", label = "Select taxonomy level and database", choices = c("Species - MetaPhlAn 4 vJan21", "SGB - MetaPhlAn 4 vJan21", "SGB - MetaPhlAn 4 vJun23", "Species - GTDB r207", "Species - GTDB r220")),
         column(4,
                br(), # Add some spacing to align with file input
                actionButton("calculate", "Calculate Toposcore", 
@@ -53,11 +53,12 @@ ui <- fluidPage(
       h4("SIG1 Species:"),
       verbatimTextOutput("sig1_species"),
       
+      downloadButton("download_sig1", "Download SIG1 bacteria list"),
+      
       h4("SIG2 Species:"),
       verbatimTextOutput("sig2_species"),
       
-      # Download buttons
-      downloadButton("download", "Download Results"),
+      downloadButton("download_sig2", "Download SIG2 bacteria list"),
       
     ),
     
@@ -139,6 +140,24 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       write.csv(results(), file, row.names = FALSE)
+    }
+  )
+  
+  output$download_sig1 <- downloadHandler(
+    filename = function() {
+      "sig1_bug_list.tsv"
+    },
+    content = function(file) {
+      file.copy("data/sig1.txt", file)
+    }
+  )
+  
+  output$download_sig2 <- downloadHandler(
+    filename = function() {
+      "sig2_bug_list.tsv"
+    },
+    content = function(file) {
+      file.copy("data/sig2.txt", file)
     }
   )
   # Modified heatmap output
@@ -312,13 +331,23 @@ server <- function(input, output, session) {
   
   # Display species lists
   output$sig1_species <- renderPrint({
-    sig1_species <- read.table("data/sig1.txt", stringsAsFactors = FALSE, sep = "\t", skip = 1)[,1]
-    cat(paste(sig1_species, collapse = "\n"))
+    convert_options <- c("species_Jan21" = "Species - MetaPhlAn 4 vJan21" , 
+                         "SGB_Jan21" = "SGB - MetaPhlAn 4 vJan21", 
+                         "SGB_Jun23" = "SGB - MetaPhlAn 4 vJun23",
+                         "GTDB_r207"= "Species - GTDB r207", 
+                         "GTDB_r220" = "Species - GTDB r220")
+    sig1_species <- read.table("data/sig1.txt", stringsAsFactors = FALSE, sep = "\t", header = T)
+    cat(sig1_species[,names(convert_options)[convert_options == input$Level]], sep = "\n")
   })
   
   output$sig2_species <- renderPrint({
-    sig2_species <- read.table("data/sig2.txt", stringsAsFactors = FALSE, sep = "\t", skip = 1)[,1]
-    cat(paste(sig2_species, collapse = "\n"))
+    convert_options <- c("species_Jan21" = "Species - MetaPhlAn 4 vJan21" , 
+                         "SGB_Jan21" = "SGB - MetaPhlAn 4 vJan21", 
+                         "SGB_Jun23" = "SGB - MetaPhlAn 4 vJun23",
+                         "GTDB_r207"= "Species - GTDB r207", 
+                         "GTDB_r220" = "Species - GTDB r220")
+    sig2_species <- read.table("data/sig2.txt", stringsAsFactors = FALSE, sep = "\t", header = T)
+    cat(sig2_species[,names(convert_options)[convert_options == input$Level]], sep = "\n")
   })
   
   # Make the results table interactive with row selection
