@@ -2,8 +2,6 @@ library(dplyr)
 library(readr)
 
 
-input_file <- "~/Desktop/PREBIOMICS/Seerave/TOPOSCORE/tests/roussy_004_0325_mpa_vJan21_CHOCOPhlAnSGB_202103_toposcoreSGBs_unclassfied.tsv"
-taxonomy_database <- 'SGB_Jan21'
 calculate_toposcore <- function(input_file, taxonomy_database = c("species_Jan21", "SGB_Jan21", "SGB_Jun23", "GTDB_r207", "GTDB_r220")) {
   
   # Read-in the data for MetaPhlAn format
