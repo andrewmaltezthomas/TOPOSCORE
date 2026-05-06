@@ -23,7 +23,7 @@ ui <- fluidPage(
                fileInput("file", "Upload microbiome tab-separated data",
                          accept = c("text/tsv", "text/tab-separated-values,text/plain", ".txt/.tsv"))
         ),
-        selectInput("Level", label = "Select taxonomy level and database", choices = c("Species - MetaPhlAn 4 vJan21", "SGB - MetaPhlAn 4 vJan21", "SGB - MetaPhlAn 4 vJun23", "Species - GTDB r207", "Species - GTDB r220")),
+        selectInput("Level", label = "Select taxonomy level and database", choices = c("Species - MetaPhlAn 4 vJan21", "SGB - MetaPhlAn 4 vJan21", "SGB - MetaPhlAn 4 vJun23", "Species - GTDB r207", "Species - GTDB r220", "MSP - GTDB r220")),
         column(4,
                br(), # Add some spacing to align with file input
                actionButton("calculate", "Calculate Toposcore", 
@@ -316,7 +316,8 @@ server <- function(input, output, session) {
                            "SGB_Jan21" = "SGB - MetaPhlAn 4 vJan21", 
                            "SGB_Jun23" = "SGB - MetaPhlAn 4 vJun23",
                            "GTDB_r207"= "Species - GTDB r207", 
-                           "GTDB_r220" = "Species - GTDB r220")
+                           "GTDB_r220" = "Species - GTDB r220", 
+                           "MSP_Meteor2" = "MSP - GTDB r220")
       res <- calculate_toposcore(input$file$datapath, names(convert_options)[convert_options == input$Level])
       results(res)
       showNotification("Calculation completed successfully!", type = "message")
@@ -335,8 +336,9 @@ server <- function(input, output, session) {
                          "SGB_Jan21" = "SGB - MetaPhlAn 4 vJan21", 
                          "SGB_Jun23" = "SGB - MetaPhlAn 4 vJun23",
                          "GTDB_r207"= "Species - GTDB r207", 
-                         "GTDB_r220" = "Species - GTDB r220")
-    sig1_species <- read.table("data/sig1.txt", stringsAsFactors = FALSE, sep = "\t", header = T)
+                         "GTDB_r220" = "Species - GTDB r220", 
+                         "MSP_Meteor2" = "MSP - GTDB r220")
+    sig1_species <- read.table("data/sig1_direct.txt", stringsAsFactors = FALSE, sep = "\t", header = T)
     cat(sig1_species[,names(convert_options)[convert_options == input$Level]], sep = "\n")
   })
   
@@ -345,8 +347,9 @@ server <- function(input, output, session) {
                          "SGB_Jan21" = "SGB - MetaPhlAn 4 vJan21", 
                          "SGB_Jun23" = "SGB - MetaPhlAn 4 vJun23",
                          "GTDB_r207"= "Species - GTDB r207", 
-                         "GTDB_r220" = "Species - GTDB r220")
-    sig2_species <- read.table("data/sig2.txt", stringsAsFactors = FALSE, sep = "\t", header = T)
+                         "GTDB_r220" = "Species - GTDB r220", 
+                         "MSP_Meteor2" = "MSP - GTDB r220")
+    sig2_species <- read.table("data/sig2_direct.txt", stringsAsFactors = FALSE, sep = "\t", header = T)
     cat(sig2_species[,names(convert_options)[convert_options == input$Level]], sep = "\n")
   })
   
