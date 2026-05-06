@@ -148,7 +148,7 @@ server <- function(input, output, session) {
       "sig1_bug_list.tsv"
     },
     content = function(file) {
-      file.copy("data/sig1.txt", file)
+      file.copy("data/sig1_direct.txt", file)
     }
   )
   
@@ -157,7 +157,7 @@ server <- function(input, output, session) {
       "sig2_bug_list.tsv"
     },
     content = function(file) {
-      file.copy("data/sig2.txt", file)
+      file.copy("data/sig2_direct.txt", file)
     }
   )
   # Modified heatmap output
