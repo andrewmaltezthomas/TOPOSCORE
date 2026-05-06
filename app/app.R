@@ -11,6 +11,7 @@ library(ggrepel)
 # Source the calculation function
 source("R/toposcore_calc.R")
 source("R/kde_plot.R")
+options(shiny.maxRequestSize=30*1024^2)
 ui <- fluidPage(
   titlePanel("Toposcore Calculator"),
   
@@ -19,10 +20,10 @@ ui <- fluidPage(
       # File upload and calculate button group
       fluidRow(
         column(8,
-               fileInput("file", "Upload microbiome data TSV file",
-                         accept = c("text/tsv", "text/tab-separated-values,text/plain", ".tsv"))
+               fileInput("file", "Upload microbiome tab-separated data",
+                         accept = c("text/tsv", "text/tab-separated-values,text/plain", ".txt/.tsv"))
         ),
-        selectInput("Level", "Select taxonomy level and database", choices = c("Species - MetaPhlAn 4 vJan21", "SGB - MetaPhlAn 4 vJan21", "Species - GTDB r207", "Species - GTDB r220")),
+        selectInput("Level", label = "Select taxonomy level and database", choices = c("Species - MetaPhlAn 4 vJan21", "SGB - MetaPhlAn 4 vJan21", "SGB - MetaPhlAn 4 vJun23", "Species - GTDB r207", "Species - GTDB r220")),
         column(4,
                br(), # Add some spacing to align with file input
                actionButton("calculate", "Calculate Toposcore", 
@@ -32,14 +33,15 @@ ui <- fluidPage(
       
       # Input data template section
       h4("Input Data Requirements:"),
-      HTML("<p><strong>Required columns:</strong></p>
+      HTML("<p>The input table should be a multi-level taxa (rows) x samples (columns) data frame.</p>
+      <p><strong>Required column:</strong></p>
            <ul>
-             <li>Sample_id: Unique identifier for each sample</li>
-             <li>Bacterial species columns: Relative abundance values</li>
-             <li>Akkermansia_muciniphila: Required for classification</li>
-           </ul>"),
-      
-      downloadButton("download_template", "Download Template File"),
+             <li>clade_name: Full level taxonomy for each taxon at different taxonomic levels</li>
+           </ul>
+      <p><strong>For MetaPhlAn 4 options, the required input is the output of the <a href='https://github.com/biobakery/MetaPhlAn/wiki/MetaPhlAn-4#merging-tables'>merge_metaphlan_tables.py</a> command</strong></p>"),
+      downloadButton("download_template", "Download MetaPhlAn 4 Template File"),
+      HTML("<p><strong>For GTDB options, the required input can be output of running the <a href='https://github.com/bluenote-1577/sylph/wiki/Taxonomic-profiling-with-the-GTDB‐R214-database'>Sylph wiki</a> and merging profiles </strong></p>"),
+      downloadButton("download_template_gtdb", "Download Sylph GTDB Template File"),
       
       # Display summary stats
       hr(),
@@ -51,11 +53,12 @@ ui <- fluidPage(
       h4("SIG1 Species:"),
       verbatimTextOutput("sig1_species"),
       
+      downloadButton("download_sig1", "Download SIG1 bacteria list"),
+      
       h4("SIG2 Species:"),
       verbatimTextOutput("sig2_species"),
       
-      # Download buttons
-      downloadButton("download", "Download Results"),
+      downloadButton("download_sig2", "Download SIG2 bacteria list"),
       
     ),
     
@@ -137,6 +140,24 @@ server <- function(input, output, session) {
     },
     content = function(file) {
       write.csv(results(), file, row.names = FALSE)
+    }
+  )
+  
+  output$download_sig1 <- downloadHandler(
+    filename = function() {
+      "sig1_bug_list.tsv"
+    },
+    content = function(file) {
+      file.copy("data/sig1.txt", file)
+    }
+  )
+  
+  output$download_sig2 <- downloadHandler(
+    filename = function() {
+      "sig2_bug_list.tsv"
+    },
+    content = function(file) {
+      file.copy("data/sig2.txt", file)
     }
   )
   # Modified heatmap output
@@ -225,10 +246,19 @@ server <- function(input, output, session) {
   # Add template download handler
   output$download_template <- downloadHandler(
     filename = function() {
-      "template_met4_valid_10rows.tsv"
+      "template_mpa4_vJan21_test_data.tsv"
     },
     content = function(file) {
-      file.copy("data/met4_valid_10rows.tsv", file)
+      file.copy("data/mpa4_vJan21_test_data.tsv", file)
+    }
+  )
+  
+  output$download_template_gtdb <- downloadHandler(
+    filename = function() {
+      "template_sylph_GTDBr220_test_data.tsv"
+    },
+    content = function(file) {
+      file.copy("data/sylph_GTDBr220_test_data.tsv", file)
     }
   )
   
@@ -284,6 +314,7 @@ server <- function(input, output, session) {
     tryCatch({
       convert_options <- c("species_Jan21" = "Species - MetaPhlAn 4 vJan21" , 
                            "SGB_Jan21" = "SGB - MetaPhlAn 4 vJan21", 
+                           "SGB_Jun23" = "SGB - MetaPhlAn 4 vJun23",
                            "GTDB_r207"= "Species - GTDB r207", 
                            "GTDB_r220" = "Species - GTDB r220")
       res <- calculate_toposcore(input$file$datapath, names(convert_options)[convert_options == input$Level])
@@ -300,13 +331,23 @@ server <- function(input, output, session) {
   
   # Display species lists
   output$sig1_species <- renderPrint({
-    sig1_species <- read.table("data/sig1.txt", stringsAsFactors = FALSE, sep = "\t", skip = 1)[,1]
-    cat(paste(sig1_species, collapse = "\n"))
+    convert_options <- c("species_Jan21" = "Species - MetaPhlAn 4 vJan21" , 
+                         "SGB_Jan21" = "SGB - MetaPhlAn 4 vJan21", 
+                         "SGB_Jun23" = "SGB - MetaPhlAn 4 vJun23",
+                         "GTDB_r207"= "Species - GTDB r207", 
+                         "GTDB_r220" = "Species - GTDB r220")
+    sig1_species <- read.table("data/sig1.txt", stringsAsFactors = FALSE, sep = "\t", header = T)
+    cat(sig1_species[,names(convert_options)[convert_options == input$Level]], sep = "\n")
   })
   
   output$sig2_species <- renderPrint({
-    sig2_species <- read.table("data/sig2.txt", stringsAsFactors = FALSE, sep = "\t", skip = 1)[,1]
-    cat(paste(sig2_species, collapse = "\n"))
+    convert_options <- c("species_Jan21" = "Species - MetaPhlAn 4 vJan21" , 
+                         "SGB_Jan21" = "SGB - MetaPhlAn 4 vJan21", 
+                         "SGB_Jun23" = "SGB - MetaPhlAn 4 vJun23",
+                         "GTDB_r207"= "Species - GTDB r207", 
+                         "GTDB_r220" = "Species - GTDB r220")
+    sig2_species <- read.table("data/sig2.txt", stringsAsFactors = FALSE, sep = "\t", header = T)
+    cat(sig2_species[,names(convert_options)[convert_options == input$Level]], sep = "\n")
   })
   
   # Make the results table interactive with row selection
