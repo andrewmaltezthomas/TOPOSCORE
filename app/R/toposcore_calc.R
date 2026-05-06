@@ -2,7 +2,7 @@ library(dplyr)
 library(readr)
 
 
-calculate_toposcore <- function(input_file, taxonomy_database = c("species_Jan21", "SGB_Jan21", "SGB_Jun23", "GTDB_r207", "GTDB_r220")) {
+calculate_toposcore <- function(input_file, taxonomy_database = c("species_Jan21", "SGB_Jan21", "SGB_Jun23", "GTDB_r207", "GTDB_r220", "MSP_Meteor2")) {
   
   # Read-in the data for MetaPhlAn format
   if(taxonomy_database == "species_Jan21" | taxonomy_database == "SGB_Jan21" | taxonomy_database == "SGB_Jun23") {
@@ -32,18 +32,36 @@ calculate_toposcore <- function(input_file, taxonomy_database = c("species_Jan21
       sampleIDs <- colnames(data)
       data <- as_tibble(t(data))
       colnames(data) <- taxa
-      data <- data[,colnames(data)[which(unlist(lapply(colnames(data), function(x) {length(unlist(strsplit(x, ";"))) })) >= 7)]]
+      keep <- which(lengths(strsplit(colnames(data), ";")) == 7)
+      data <- data[, keep]
       colnames(data) <- lapply(colnames(data), function(x) {unlist(strsplit(x, ";"))[7] } )
       #Sum and remove duplicate columns 
-      col_names <- names(data)
-      dup_names <- unique(col_names[duplicated(col_names)])
-      data_subset <- data[, !col_names %in% dup_names]
-      # Add summed columns for each duplicated name
-      for (dup_name in dup_names) {
-        cols <- which(col_names == dup_name)
-        data_subset[[dup_name]] <- rowSums(data[, cols])
+      data <- t(rowsum(t(data), group = colnames(data)))
+      s <- rowSums(data, na.rm = TRUE)
+      mx <- max(data, na.rm = TRUE)
+      if(mx <= 1 + 0.05 && all(s <= 1 + 0.05)) {
+        data <- data * 100
       }
-      data <- data_subset
+      data <- as_tibble(data)
+    }
+  }
+  
+  # Read-in the data for Meteor2 format
+  if(taxonomy_database == "MSP_Meteor2") {
+    data <- read_tsv(input_file, name_repair = "minimal", comment = "#")
+    if(!"msp" %in% colnames(data)) {
+      stop("It appears as msp numbers are not in your table")
+    }
+    else if(!"msp_taxonomy" %in% colnames(data)) {
+      stop("It appears as msp taxonomies are not in your table")
+    }
+    else {
+      msp_tax <- data %>% dplyr::select(msp, msp_taxonomy)
+      taxa <- data$msp
+      data <- data %>% dplyr::select(-msp, -msp_taxonomy)
+      sampleIDs <- colnames(data)
+      data <- as_tibble(t(data))
+      colnames(data) <- taxa
     }
   }
   
@@ -52,18 +70,11 @@ calculate_toposcore <- function(input_file, taxonomy_database = c("species_Jan21
     if (SGB9226 == TRUE) {
       akk_sgb9226_ab <- data %>% select(grep("SGB9226$", colnames(data)))
     }
-    data <- data[,colnames(data)[which(unlist(lapply(colnames(data), function(x) {length(unlist(strsplit(x, "\\|"))) })) >= 7)]]
-    colnames(data) <- unlist(lapply(colnames(data), function(x) {unlist(strsplit(x, "\\|"))[7] } ))
+    keep <- which(lengths(strsplit(colnames(data), "\\|")) >= 7)
+    data <- data[, keep]
     colnames(data) <- gsub("s__", "", colnames(data))
     #Sum and remove duplicate columns 
-    col_names <- names(data)
-    dup_names <- unique(col_names[duplicated(col_names)])
-    data_subset <- data[, !col_names %in% dup_names]
-    # Add summed columns for each duplicated name
-    for (dup_name in dup_names) {
-      cols <- which(col_names == dup_name)
-      data_subset[[dup_name]] <- rowSums(data[, cols])
-    }
+    data <- t(rowsum(t(data), group = colnames(data)))
     if (SGB9226 == TRUE) {
       data <- bind_cols(data_subset, akk_sgb9226_ab)
     }
@@ -90,9 +101,20 @@ calculate_toposcore <- function(input_file, taxonomy_database = c("species_Jan21
     }
   }
   
+  if (taxonomy_database == "MSP_Meteor2") {
+    SGB9226 <- ifelse(length(grep("msp_0025$", colnames(data))) > 0, TRUE, FALSE)
+    if(SGB9226 == FALSE) {
+      akk <- data %>% select(grep(gmsp_tax$msp[grep("muciniphila$", msp_tax$msp_taxonomy)], colnames(data)))
+    }
+    if(SGB9226 == FALSE) {
+      data <- bind_cols(data, akk)
+    }
+  }
+  
+  
   # Read signature species
-  sig1_species <- read.table("data/sig1.txt", stringsAsFactors = FALSE, header = T, sep = "\t")
-  sig2_species <- read.table("data/sig2.txt", stringsAsFactors = FALSE, header = T, sep = "\t")
+  sig1_species <- read.table("data/sig1_direct.txt", stringsAsFactors = FALSE, header = T, sep = "\t")
+  sig2_species <- read.table("data/sig2_direct.txt", stringsAsFactors = FALSE, header = T, sep = "\t")
   
   # Check which species are present in the data
   sig1_species$PresentAbsent <- apply(sig1_species, 1, function(x, column = taxonomy_database) {
@@ -214,6 +236,36 @@ calculate_toposcore <- function(input_file, taxonomy_database = c("species_Jan21
           sum(c_across(all_of(grep("SGB9226$", colnames(data), perl = T))), na.rm = TRUE) >= 4.799 ~ "High",
           sum(c_across(all_of(grep("SGB9226$", colnames(data), perl = T))), na.rm = TRUE) == 0 ~ "Zero",
           sum(c_across(all_of(grep("SGB9226$", colnames(data), perl = T))), na.rm = TRUE) > 0 & sum(c_across(all_of(grep("SGB9226$", colnames(data), perl = T))), na.rm = TRUE) < 4.799 ~ "Normal"),
+        # Updated Toposcore classification
+        Toposcore = case_when(
+          SIG_class == "SIG1" ~ "SIG1+",
+          SIG_class == "SIG2" ~ "SIG2+",
+          SIG_class == "Gray" & (Akk_status %in% c("High", "Zero")) ~ "SIG1+",
+          SIG_class == "Gray" & (Akk_status == "Normal") ~ "SIG2+",
+          TRUE ~ "SIG2+"))
+    results$Sample_id <- sampleIDs
+    results <- results %>% dplyr::select(
+      Sample_id, 
+      Akk_status,
+      SIG1_count,
+      SIG2_count,
+      S_score,
+      SIG_class,
+      Toposcore,
+      SIG1_taxa, 
+      SIG2_taxa,
+      # Include OS12 if it exists in the input data
+      any_of("OS12")
+    )
+    return(results)
+  }
+  if ((taxonomy_database == "MSP_Meteor2" & SGB9226 == TRUE)) {
+    results <- data %>% rowwise() %>%
+      mutate(
+        Akk_status = case_when(
+          sum(c_across(all_of(grep("msp_0025$", colnames(data), perl = T))), na.rm = TRUE) >= 4.799 ~ "High",
+          sum(c_across(all_of(grep("msp_0025$", colnames(data), perl = T))), na.rm = TRUE) == 0 ~ "Zero",
+          sum(c_across(all_of(grep("msp_0025$", colnames(data), perl = T))), na.rm = TRUE) > 0 & sum(c_across(all_of(grep("msp_0025$", colnames(data), perl = T))), na.rm = TRUE) < 4.799 ~ "Normal"),
         # Updated Toposcore classification
         Toposcore = case_when(
           SIG_class == "SIG1" ~ "SIG1+",
