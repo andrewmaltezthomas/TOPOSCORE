@@ -1,18 +1,10 @@
-# List all required packages
-packages <- c(
-  "shiny",
-  "DT",
-  "ggplot2",
-  "dplyr",
-  "here",
-  "readr",
-  "ggnewscale",
-  "ggrepel"
-)
-
-# Install missing packages
-new_packages <- packages[!(packages %in% installed.packages()[,"Package"])]
-if(length(new_packages)) install.packages(new_packages)
-
-# Load all packages
-invisible(lapply(packages, library, character.only = TRUE))
+# Lists the packages the TOPOSCORE app needs and reports any that are missing (does not install them).
+pkgs <- c("shiny", "bslib", "DT", "ggplot2", "ggrepel", "tibble")
+missing <- pkgs[!vapply(pkgs, requireNamespace, logical(1), quietly = TRUE)]
+if (length(missing)) {
+  message("Missing packages: ", paste(missing, collapse = ", "),
+          "\nInstall with: install.packages(c(", paste0('"', missing, '"', collapse = ", "), "))")
+} else {
+  message("All TOPOSCORE app packages are installed.")
+}
+if (packageVersion("bslib") < "0.6.0") message("bslib >= 0.6.0 is recommended.")
