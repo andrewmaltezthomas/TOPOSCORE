@@ -1,140 +1,113 @@
-# Custom scoring based on ecological topology of gut microbiota associated with cancer immunotherapy outcome. 
-The gut microbiota influences clinical responses of cancer patients to immune checkpoint inhibitors. However, there is no consensus definition of detrimental dysbiosis. Based on metagenomics (MG) sequencing of 245 non-small cell lung cancer (NSCLC) patient feces, we constructed species-level co-abundance networks that were clustered into species interacting groups (SIG) correlating with overall survival. Thirty-seven and 45 MG species were associated with resistance (SIG1) and response (SIG2) to ICI, respectively. If combined with the quantification of Akkermansia species, this procedure allowed a person-based calculation of a topological score (TOPOSCORE) that was validated in additional 254 NSCLC patients and in 216 genitourinary cancers. Finally, this TOPOSCORE was translated into a 21 bacterial probe set-based qPCR- scoring that was validated in a prospective cohort of NSCLC patients, as well as in colorectal and melanoma patients. This approach could represent a dynamic diagnosis tool of intestinal dysbiosis to guide personalized microbiota-centered interventions.
+# Custom scoring based on ecological topology of gut microbiota associated with cancer immunotherapy outcome
 
-[LINK](https://www.cell.com/cell/fulltext/S0092-8674(24)00538-5?_returnURL=https%3A%2F%2Flinkinghub.elsevier.com%2Fretrieve%2Fpii%2FS0092867424005385%3Fshowall%3Dtrue) to the original article
+The gut microbiota influences clinical responses of cancer patients to immune checkpoint inhibitors. However, there is no consensus definition of detrimental dysbiosis. Based on metagenomics (MG) sequencing of 245 non-small cell lung cancer (NSCLC) patient feces, we constructed species-level co-abundance networks that were clustered into species interacting groups (SIG) correlating with overall survival. Thirty-seven and 45 MG species were associated with resistance (SIG1) and response (SIG2) to ICI, respectively. If combined with the quantification of Akkermansia species, this procedure allowed a person-based calculation of a topological score (TOPOSCORE) that was validated in additional 254 NSCLC patients and in 216 genitourinary cancers. Finally, this TOPOSCORE was translated into a 21 bacterial probe set-based qPCR-scoring that was validated in a prospective cohort of NSCLC patients, as well as in colorectal and melanoma patients. This approach could represent a dynamic diagnosis tool of intestinal dysbiosis to guide personalized microbiota-centered interventions.
+
+[Original article](https://doi.org/10.1016/j.cell.2024.05.029)
 
 If you find it useful, please cite:
-Derosa, Lisa, Valerio Iebba, Carolina Alves Costa Silva, Gianmarco Piccinno, Guojun Wu, Leonardo Lordello, Bertrand Routy, et al. “Custom Scoring Based on Ecological Topology of Gut Microbiota Associated with Cancer Immunotherapy Outcome.” Cell (Elsevier BV, June 2024). https://doi.org/10.1016/j.cell.2024.05.029.
- 
+Derosa L, Iebba V, Alves Costa Silva C, Piccinno G, Wu G, Lordello L, Routy B, et al. Custom scoring based on ecological topology of gut microbiota associated with cancer immunotherapy outcome. *Cell* (2024). https://doi.org/10.1016/j.cell.2024.05.029
 
-# Toposcore Calculator
+# TOPOSCORE Calculator
 
-A Shiny application for calculating Toposcores from microbiome data to predict immunotherapy response.
+A Shiny application that calculates TOPOSCORE from taxonomic profiles produced by several profilers and databases.
 
-Live demo: [Toposcore Calculator](https://toposcore.shinyapps.io/toposcore-calculator/)
+Web app: https://oncobiome-atlas.shinyapps.io/TOPOSCORE/
 
-## USING THE WEB INTERFACE
+## Supported profilers and databases
 
-### Quick Start
-1. Visit [https://toposcore.shinyapps.io/toposcore-calculator/](https://toposcore.shinyapps.io/toposcore-calculator/)
-2. Upload your microbiome data CSV file
-3. Click "Calculate Toposcore"
-4. View and analyze results
+| Option | Input | Identifiers used |
+|---|---|---|
+| Species - MetaPhlAn 4 vJan21 | `merge_metaphlan_tables.py` output | `s__` names (original TOPOSCORE species) |
+| SGB - MetaPhlAn 4 vJan21 / vJun23 / vJan25 | `merge_metaphlan_tables.py` output with `t__SGB` rows | SGB IDs |
+| Species - GTDB r207 / r220 | `clade_name` with `d__;p__;...;s__` lineages (sylph, mOTUs4, Kraken2/Bracken + GTDB) | GTDB species |
+| Species - UHGG v2.0.2 | Kraken2/Bracken + UHGG, same lineage format | UHGG (GTDB-labelled) species |
+| MSP - Meteor2 | `msp`, `msp_taxonomy` and sample columns | MSP IDs |
 
-### Detailed Usage Guide
+Taxa are in rows and samples in columns. Relative abundances can be percentages or fractions: fractions are detected and converted to percent. Annotation columns (`NCBI_tax_id`, `additional_species`, `bracken_taxid`, `genome_size`, ...) are ignored.
 
-#### 1. Data Upload
-- Click "Browse..." to select your microbiome data file
-- File must be in CSV format
-- Required columns:
-  - `Sample_id`: Unique identifier for each sample
-  - Bacterial species columns with relative abundance values
-  - `Akkermansia_muciniphila`: Required for classification
-- Use "Download Template File" button to get a sample format
+For Kraken2/Bracken, correct the Bracken read fractions for genome length before uploading. The *Akkermansia* High cut-off is defined on taxonomic (cell) abundance, and uncorrected read fractions overestimate it.
 
-#### 2. Calculation
-- After uploading data, click "Calculate Toposcore"
-- Results will appear in the table below
+The non-MetaPhlAn options use a genome-based crosswalk (`app/data/toposcore_crosswalk.tsv`) that maps each of the 82 signature species to the identifier(s) used by each database. A species counts as detected if any of its identifiers has a non-zero abundance. Signature species that a table does not contain are listed after each run, because they always count as not detected.
 
-#### 3. Viewing Results
-- Results table shows:
-  - Sample IDs
-  - S-scores
-  - SIG classifications
-  - Toposcores
-- Summary statistics display:
-  - Distribution of SIG1/Gray/SIG2 classifications
-  - Count of SIG1+ and SIG2+ Toposcores
+## How the score is calculated
 
-#### 4. Visualization
-- Select samples using the dropdown menu or "Select All"
-- Score Distribution Plot shows:
-  - Reference KDE plot
-  - Selected samples as red vertical lines
-  - Sample IDs labeled on the plot
-- Species Heatmap displays:
-  - Relative abundance of signature species
-  - Akkermansia muciniphila levels
-  - Color-coded by abundance levels
+1. S-score = 0.5 × (SIG2 detected / 45 − SIG1 detected / 37 + 1), rounded to 3 decimals.
+2. SIG class: SIG1 if S ≤ 0.5351, SIG2 if S ≥ 0.7911, otherwise grey zone.
+3. *Akkermansia muciniphila*: Zero (0), High (≥ 4.799%; ≥ 4.52% for Meteor2), otherwise Normal.
+4. TOPOSCORE: SIG1 → SIG1+, SIG2 → SIG2+; grey zone → SIG1+ if *Akkermansia* is Zero or High, SIG2+ if Normal.
 
-#### 5. Downloading Results
-- "Download Results Table": Save complete results as CSV
-- "Download Plot": Save the score distribution plot as PDF
+## Using the app
 
-## BUILDING AND MODIFYING THE APP
+1. Upload a merged profile table (tab-separated). The app recognises the table format and warns if it does not match the selected option.
+2. Choose the profiler and database.
+3. Press **Calculate TOPOSCORE**.
 
-### Prerequisites
-- R (>= 4.0.0)
-- RStudio (recommended)
+Results:
+- Summary boxes: SIG1+ / SIG2+ counts and SIG class distribution.
+- Run details: database, *Akkermansia* identifier and cut-off, abundance units, and the signature species missing from the table.
+- **Results table**: per-sample S-score, SIG class, TOPOSCORE, *Akkermansia* status and abundance, and the detected SIG1/SIG2 species. Download it as CSV; the CSV includes the database and app version.
+- **Score distribution**: your samples against the discovery cohort, split by overall survival. Highlight samples by name or by selecting table rows.
+- **Signature species**: a heatmap of which SIG1/SIG2 species were detected in each sample, ordered by S-score, with species missing from the table marked.
 
-### Dependencies
+The **Signature species** tab lists the crosswalk for the selected database.
 
-Required R packages
-```
-packages <- c(
-"shiny",
-"DT",
-"ggplot2",
-"dplyr",
-"readr",
-"ggnewscale",
-"ggrepel"
-)
+Example input files are available in the sidebar.
+
+## Running locally
+
+Requires R ≥ 4.1.
+
+```r
+install.packages(c("shiny", "bslib", "DT", "ggplot2", "ggrepel", "tibble"))
+shiny::runApp("app")
 ```
 
-### App Project Structure
-toposcore-calculator/
-├── app/
-│ ├── app.R # Main Shiny application
-│ ├── R/
-│ │ ├── toposcore_calc.R # Calculation functions
-│ │ └── kde_plot.R # Plotting functions
-│ └── data/
-│ ├── sig1.txt # SIG1 species list
-│ ├── sig2.txt # SIG2 species list
-│ ├── scores_disc.csv # Reference scores
-│ ├── clin_disc.csv # Clinical data
-│ └── met4_valid_10rows.csv # Template file
-├── dependencies.R # Package dependencies
-└── README.md
+`source("app/dependencies.R")` lists any missing packages without installing them. For a reproducible setup, use `renv::init()` in the repository and commit `renv.lock`.
 
-### Installation
+### Using the function without the app
 
-1. Clone the repository:
+```r
+source("app/R/toposcore_calc.R")
+res <- calculate_toposcore("my_profiles.tsv", taxonomy_database = "GTDB_r220")
+attr(res, "diagnostics")   # species not found, Akkermansia identifier and cut-off, scaling
+attr(res, "presence")      # samples x signature species, TRUE if detected
 ```
-git clone https://github.com/valerioiebba/TOPOSCORE.git
-cd TOPOSCORE
-```
-2. Install required packages in R:
-   
-```source("app/dependencies.R")```
 
-### Running Locally
-1. Open RStudio
-2. Open `app/app.R`
-3. Click "Run App" or run: ```shiny::runApp("app")```
+`toposcore_databases` lists the valid `taxonomy_database` values.
+
+### Tests
+
+```sh
+cd app && Rscript tests/run_tests.R
+```
 
 ### Deployment
-To deploy to shinyapps.io:
-1. Create an account at [shinyapps.io](https://www.shinyapps.io)
-2. Install rsconnect package: ```rsconnect::deployApp("app")```
 
-### Customization
-- Modify `R/toposcore_calc.R` to adjust calculation methods
-- Update `R/kde_plot.R` to customize visualizations
-- Edit `app.R` to modify the UI/UX
-- Update species lists in `data/sig1.txt` and `data/sig2.txt`
+```r
+rsconnect::deployApp("app")
+```
 
-### Contributing
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+## Project structure
 
-## License
+```
+app/
+├── app.R                      # Shiny UI and server
+├── R/
+│   ├── toposcore_calc.R       # calculation, input parsing, format detection
+│   └── plots.R                # score distribution and signature heatmap
+├── data/
+│   ├── toposcore_crosswalk.tsv          # 82 signature species x database identifiers
+│   ├── scores_disc.csv, clin_disc.csv   # discovery cohort reference
+│   └── *_test_data.tsv                  # example inputs
+├── www/                       # logos
+├── tests/run_tests.R
+└── dependencies.R
+```
+
+Uploaded files are processed in memory and not stored. For research use only.
 
 ## Contact
+
 Valerio Iebba: valerio.iebba@gmail.com
 
 Abhilash Dhal: adhalbiophysics@gmail.com
